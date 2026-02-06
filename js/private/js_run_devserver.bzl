@@ -67,18 +67,15 @@ def _js_run_devserver_impl(ctx):
 
     default_data_runfiles = [target[DefaultInfo].default_runfiles.files for target in ctx.attr.data]
 
-    # Build the list of data files to copy to the custom sandbox using ctx.actions.args()
-    entries = ctx.actions.args()
-    entries.set_param_file_format("multiline")
-    entries.add("[")
-    entries.add_joined(
-        depset(transitive = transitive_runfiles + [dep.files for dep in ctx.attr.data] + default_data_runfiles),
-        expand_directories = False,
-        map_each = _file_to_entry_json,
-        join_with = ",",
-    )
-    entries.add("]")
-    ctx.actions.write(entries_json_file, content = entries)
+    # Build the list of data files to copy to the custom sandbox.
+    # Keep explicit stable content here so the FileWrite action key always changes
+    # when the underlying file set changes.
+    entries = []
+    for file in depset(transitive = transitive_runfiles + [dep.files for dep in ctx.attr.data] + default_data_runfiles).to_list():
+        entry = _file_to_entry_json(file)
+        if entry != None:
+            entries.append(entry)
+    ctx.actions.write(entries_json_file, content = "[{}]".format(",".join(sorted(entries))))
 
     config = {}
 
